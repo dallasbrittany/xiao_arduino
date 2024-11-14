@@ -16,6 +16,7 @@ const char *password = "mypassword";
 
 I2C_BM8563 rtc(I2C_BM8563_DEFAULT_ADDRESS, Wire);
 I2C_BM8563_TimeTypeDef timeStruct;
+I2C_BM8563_TimeTypeDef tempStruct;
 I2C_BM8563_DateTypeDef dateStruct;
 
 TFT_eSPI tft = TFT_eSPI();  // Invoke library, pins defined in User_Setup.h
@@ -54,6 +55,8 @@ float time_secs = h * 3600 + m * 60 + s;
 
 // Time for next tick
 uint32_t targetTime = 0;
+uint32_t retries = 0;
+#define RETRIES_MAX 15
 
 // =========================================================================
 // Setup
@@ -61,6 +64,7 @@ uint32_t targetTime = 0;
 void setup() {
   Serial.begin(115200);
   Serial.println("Booting...");
+  Serial.printf("Initial time_secs %f", time_secs);
 
   // Initialise the screen
   tft.init();
@@ -81,30 +85,48 @@ void setup() {
   // Draw the whole clock - NTP time not available yet
   renderFace(time_secs);
 
+  Wire.begin();
+  rtc.begin();
+
 #if defined(CONFIG_IDF_TARGET_ESP32S3) || defined(CONFIG_IDF_TARGET_ESP32C3)
   WiFi.begin(ssid, password);
-  while ( WiFi.status() != WL_CONNECTED ) 
+  while ( WiFi.status() != WL_CONNECTED && retries < RETRIES_MAX )
   {
     delay ( 500 );
     Serial.print ( "." );
+    retries += 1;
   }
-  configTime(8 * 3600, 0, ntpServer);
-  struct tm timeInfo;
-  if (getLocalTime(&timeInfo)) {
-    timeStruct.hours   = timeInfo.tm_hour;
-    timeStruct.minutes = timeInfo.tm_min;
-    timeStruct.seconds = timeInfo.tm_sec;
-    rtc.setTime(&timeStruct);
-    // dateStruct.weekDay = timeInfo.tm_wday;
-    // dateStruct.month   = timeInfo.tm_mon + 1;
-    // dateStruct.date    = timeInfo.tm_mday;
-    // dateStruct.year    = timeInfo.tm_year + 1900;
-    // rtc.setDate(&dateStruct);
+
+  if (retries == RETRIES_MAX) {
+    Serial.print("Working offline");
+  } else {
+    Serial.print("Getting time online");
+    configTime(8 * 3600, 0, ntpServer);
+
+    struct tm timeInfo;
+    if (getLocalTime(&timeInfo)) {
+      Serial.printf(" %i:%i ", timeInfo.tm_hour, timeInfo.tm_min); // correct here
+      timeStruct.hours   = timeInfo.tm_hour;
+      timeStruct.minutes = timeInfo.tm_min;
+      timeStruct.seconds = timeInfo.tm_sec;
+      Serial.print("Setting time");
+      rtc.setTime(&timeStruct);
+
+
+      rtc.getTime(&tempStruct);
+      Serial.printf(" (tempStruct %i:%i) ", tempStruct.hours, tempStruct.minutes); // incorrect time here if you don't set date? check this by commenting out date settings before trying with a new board
+
+      dateStruct.weekDay = timeInfo.tm_wday;
+      dateStruct.month   = timeInfo.tm_mon + 1;
+      dateStruct.date    = timeInfo.tm_mday;
+      dateStruct.year    = timeInfo.tm_year + 1900;
+      rtc.setDate(&dateStruct);
+    } else {
+      Serial.print("Can't get local time");
+    }
   }
 #endif
 
-  Wire.begin();
-  rtc.begin();
   syncTime();
 }
 
@@ -122,9 +144,13 @@ void loop() {
     time_secs += 0.100;
 
     // Midnight roll-over
-    if (time_secs >= (60 * 60 * 24)) time_secs = 0;
+    if (time_secs >= (60 * 60 * 24)) {
+      Serial.print("midnight rollover");
+      time_secs = 0;
+    }
 
     // All graphics are drawn in sprite to stop flicker
+    // Serial.printf("time_secs %f", time_secs);
     renderFace(time_secs);
 
     // syncTime();
@@ -202,4 +228,5 @@ void syncTime(void){
   targetTime = millis() + 100;
   rtc.getTime(&timeStruct);
   time_secs = timeStruct.hours * 3600 + timeStruct.minutes * 60 + timeStruct.seconds;
+  Serial.printf("Updating in syncTime %f", time_secs);
 }

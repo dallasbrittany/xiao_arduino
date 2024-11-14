@@ -1,3 +1,5 @@
+// NOTE: Installing this may require a reset to load something new (by pressing/holding the black buttons on the board)
+
 #include <lvgl.h>
 
 // uncomment a library for display driver
