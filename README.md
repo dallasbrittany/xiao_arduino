@@ -16,3 +16,4 @@ If the hardware test is loaded, [this tip](https://www.eevblog.com/forum/beginne
 - [Grove Red LED Matrix w/Driver](https://wiki.seeedstudio.com/Grove-Red_LED_Matrix_w_Driver/)
 - [GitHub: Grove_LED_Matrix_Driver_HT16K33](https://github.com/Seeed-Studio/Grove_LED_Matrix_Driver_HT16K33)
 - [LED Matrix Editor](https://xantorohara.github.io/led-matrix-editor/#) : Create an emoji for the Matrix 😁 or whatever you want
+- [Grove Touch Sensor](https://wiki.seeedstudio.com/Grove-Touch_Sensor/)
